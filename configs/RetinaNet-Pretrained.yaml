@@ -1,0 +1,83 @@
+lr: 0.001
+warmup_lr: 0.01
+start_epoch: 300
+max_num_epochs: 600
+pretrained_backbone: True
+trainable_backbone_layers: 5
+warmup_trainable_backbone_layers: 5
+
+custom_params:
+  warmup_lr: "@warmup_lr"
+  lr: "@lr"
+  pretrained_backbone: "@pretrained_backbone"
+  trainable_backbone_layers: "@trainable_backbone_layers"
+  warmup_trainable_backbone_layers: "@warmup_trainable_backbone_layers"
+  start_epoch: "@start_epoch"
+  max_num_epochs: "@max_num_epochs"
+
+
+backbone: "$src.network.load_pretrained_resnet(@in_channels, @conv1_t_stride, [max(7, 2 * s + 1) for s in @conv1_t_stride])"
+warmup_ckpt_dir: $@bundle_root + '/models/'+@warmup_run_prefix+'_models/trainable_backbone_layers='+str(@warmup_trainable_backbone_layers)+'-lr='+str(@warmup_lr)
+ckpt_dir:  $@bundle_root + '/models/'+@run_prefix+'_models/trainable_backbone_layers='+str(@warmup_trainable_backbone_layers)+'--'+str(@trainable_backbone_layers)+'-lr='+str(@lr)
+
+warmup_run_prefix: 'RetinaNet-Warmup'
+run_prefix: 'RetinaNet-Pretrained'
+
+train:
+  - "$@detector.network.to('cuda')"
+  - "$src.helpers.configure_detector(@detector,@hard_negative_sampler_kwargs,@box_selector_kwargs,@val_roi_size, @atss_matcher_kwargs)"
+  - "$src.helpers.set_starting_epoch(@trainer, @start_epoch, @num_train_batches_per_epoch)"
+  - "$@trainer.run()"
+
+trainer:
+  _target_: SupervisedTrainer
+  device: "cuda"
+  max_epochs: "@max_num_epochs"
+  epoch_length: "@num_train_batches_per_epoch"
+  train_data_loader: "@train_loader"
+  prepare_batch: "@prepare_batch"
+  network: "@detector"
+  optimizer: "@opt"
+  amp: True
+  loss_function: "$src.network.detection_loss"
+  decollate: false
+  train_handlers:
+  - _target_: "LrScheduleHandler"
+    lr_scheduler: "@scheduler"
+  - _target_: StatsHandler
+    output_transform: "$lambda x:x"
+  - _target_: ValidationHandler
+    interval: 1
+    validator: "@validator"
+    exec_at_start: False
+  - _target_: MLFlowHandler
+    tracking_uri: "@mlflow_tracking_uri"
+    experiment_name: "@experiment_name"
+    run_name: "@run_name"
+    output_transform: "$lambda x:x['loss']"
+    dataset_dict:
+      train: "@train_dataset"
+    dataset_keys:
+      - "ct"
+      - "pet"
+      - "inst_seg"
+      - "image"
+    state_attributes:
+      - "iteration"
+      - "epoch"
+    tag_name: 'Train_Loss'
+    experiment_param: "$src.helpers.create_mlflow_experiment_params( @bundle_root + '/RetinaNet/params.yaml', @custom_params)"
+  - _target_: CheckpointSaver
+    save_dir: "@ckpt_dir"
+    save_dict:
+      detector: "@detector"
+      opt: "@opt"
+      scheduler: "@scheduler"
+    save_interval: 1
+    n_saved: 1
+  #Added
+  - _target_: CheckpointLoader
+    load_path: $@warmup_ckpt_dir + '/checkpoint_epoch='+str(src.helpers.get_checkpoint('latest',@warmup_ckpt_dir))+'.pt'
+    load_dict:
+      detector: "@detector"
+    map_location: "cuda:0"

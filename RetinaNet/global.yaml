@@ -20,7 +20,7 @@ label_key: "label"
 box_key: "box"
 
 trainable_backbone_layers: None
-
+pretrained_backbone: False
 
 ckpt_dir: $@bundle_root + '/models/'+@run_prefix+'_models/trainable_backbone_layers='+str(@trainable_backbone_layers)+'-lr='+str(@lr)
 

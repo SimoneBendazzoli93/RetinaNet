@@ -1,0 +1,13 @@
+pretrained_backbone: True
+trainable_backbone_layers: 2
+lr: 0.01
+
+custom_params:
+  pretrained_backbone: "@pretrained_backbone"
+  trainable_backbone_layers: "@trainable_backbone_layers"
+  num_train_batches_per_epoch: "@num_train_batches_per_epoch"
+  lr: "@lr"
+
+backbone: "$src.network.load_pretrained_resnet(@in_channels, @conv1_t_stride, [max(7, 2 * s + 1) for s in @conv1_t_stride])"
+
+run_prefix: 'RetinaNet-Warmup'

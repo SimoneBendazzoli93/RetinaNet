@@ -21,7 +21,7 @@ feature_extractor:
   _target_: "$monai.apps.detection.networks.retinanet_network.resnet_fpn_feature_extractor"
   backbone: "@backbone"
   spatial_dims: 3
-  pretrained_backbone: False
+  pretrained_backbone: "@pretrained_backbone"
   trainable_backbone_layers: "@trainable_backbone_layers"
   returned_layers: "@returned_layers"
 
