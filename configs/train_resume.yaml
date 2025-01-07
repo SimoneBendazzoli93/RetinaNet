@@ -1,0 +1,55 @@
+train:
+  - "$@detector.network.to('cuda')"
+  - "$src.helpers.configure_detector(@detector,@hard_negative_sampler_kwargs,@box_selector_kwargs,@val_roi_size, @atss_matcher_kwargs)"
+  #Added
+  - "$src.helpers.reload_checkpoint(@trainer, @reload_checkpoint_epoch, @num_train_batches_per_epoch, @ckpt_dir)"
+  - "$@trainer.run()"
+
+trainer:
+  _target_: SupervisedTrainer
+  device: "cuda"
+  max_epochs: "@max_num_epochs"
+  epoch_length: "@num_train_batches_per_epoch"
+  train_data_loader: "@train_loader"
+  prepare_batch: "@prepare_batch"
+  network: "@detector"
+  optimizer: "@opt"
+  amp: True
+  loss_function: "$src.network.detection_loss"
+  decollate: false
+  train_handlers:
+  - _target_: "LrScheduleHandler"
+    lr_scheduler: "@scheduler_warmup"
+  - _target_: StatsHandler
+    output_transform: "$lambda x:x"
+  - _target_: ValidationHandler
+    interval: 1
+    validator: "@validator"
+    exec_at_start: False
+  - _target_: MLFlowHandler
+    tracking_uri: "@mlflow_tracking_uri"
+    experiment_name: "@experiment_name"
+    run_name: "@run_name"
+    output_transform: "$lambda x:x['loss']"
+    state_attributes:
+      - "iteration"
+      - "epoch"
+    tag_name: 'Train_Loss'
+  - _target_: CheckpointSaver
+    save_dir: "@ckpt_dir"
+    save_dict:
+      detector: "@detector"
+      opt: "@opt"
+      scheduler_warmup: "@scheduler_warmup"
+      scheduler: "@scheduler"
+    save_interval: 1
+    n_saved: 1
+  #Added
+  - _target_: CheckpointLoader
+    load_path: $@ckpt_dir + '/checkpoint_epoch='+str(src.helpers.get_checkpoint(@reload_checkpoint_epoch,@ckpt_dir))+'.pt'
+    load_dict:
+      detector: "@detector"
+      opt: "@opt"
+      scheduler_warmup: "@scheduler_warmup"
+      scheduler: "@scheduler"
+    map_location: "cuda:0"
