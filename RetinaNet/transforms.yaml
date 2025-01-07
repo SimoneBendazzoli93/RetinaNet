@@ -586,5 +586,5 @@ val_postprocessing:
       keys: "pred"
       output_dir: "@preprocess_dir"
       output_postfix: "pred_boxes"
-      run_id: '@run_name'
+      run_id: '@run_prefix'
       key_postfix: "$@modality_conf['image']['suffix']"

@@ -1,0 +1,41 @@
+validate:
+  - "$@detector.network.to('cuda')"
+  - "$src.helpers.configure_detector(@detector,@hard_negative_sampler_kwargs,@box_selector_kwargs,@val_roi_size, @atss_matcher_kwargs)"
+  - "$@val_pbar.attach(@validator,metric_names=['mAP'])"
+  - "$@validator.run()"
+  - "$src.helpers.log_validation_summary_to_mlflow(@experiment_name, @run_name, @output_metric_file)"
+
+prepare_val_batch: "$src.batch_helper.PrepareBatch(@image_key, @label_key, @box_key,validation=True, whole_image_validation=True)"
+
+
+
+val_pbar:
+  _target_: "ignite.contrib.handlers.tqdm_logger.ProgressBar"
+
+final_val_data: "$src.batch_helper.filter_validation_data(@val_data, @preprocess_dir, @image_key, '_'+@image_suffix+'.nii.gz', 'pred_boxes', @run_name)"
+
+final_val_dataset:
+  _target_: Dataset
+  data: '@final_val_data'
+  transform: '@final_val_transforms'
+
+validator:
+  _target_: SupervisedEvaluator
+  device: "cuda"
+  val_data_loader: "@final_val_loader"
+  decollate: false
+  network: "@detector"
+  prepare_batch: "@prepare_val_batch"
+  postprocessing: "@val_postprocessing"
+  key_val_metric:
+    mAP: "@mAP"
+  val_handlers:
+    - _target_: StatsHandler
+      output_transform: "$lambda x:x"
+    - _target_: CheckpointLoader
+      load_path: $@ckpt_dir + '/checkpoint_epoch='+str(src.helpers.get_checkpoint(@reload_checkpoint_epoch,@ckpt_dir))+'.pt'
+      load_dict:
+        detector: "@detector"
+      map_location: "cuda:0"
+
+

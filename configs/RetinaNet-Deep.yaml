@@ -1,0 +1,6 @@
+run_prefix: "RetinaNet-Deep"
+returned_layers:
+- 1
+- 2
+- 3
+- 4
