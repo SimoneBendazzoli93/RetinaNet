@@ -1,0 +1,35 @@
+prepare_val_batch: "$src.batch_helper.PrepareBatch(@image_key, @label_key, @box_key,validation=True, whole_image_validation=False)"
+
+mAP:
+  _target_: IgniteMetricHandler
+  metric_fn: "$src.ignite_metric.MonaiBoxMetric(@coco_metric, @output_metric_file)"
+  output_transform: "$src.ignite_metric.IgniteMetricTransform(@label_key, @box_key)"
+
+coco_metric:
+  _target_: COCOMetric
+  classes: "@fg_labels"
+  iou_list:
+  - 0.1
+  - 0.5
+  max_detection:
+  - 100
+
+validator:
+  _target_: SupervisedEvaluator
+  device: "cuda"
+  epoch_length: "@num_val_batches_per_epoch"
+  val_data_loader: "@val_loader"
+  decollate: false
+  network: "@detector"
+  prepare_batch: "@prepare_val_batch"
+  key_val_metric:
+    mAP: "@mAP"
+  val_handlers:
+  - _target_: StatsHandler
+    output_transform: "$lambda x:x"
+  - _target_: MLFlowHandler
+    tracking_uri: "@mlflow_tracking_uri"
+    run_name: "@run_name"
+    experiment_name: "@experiment_name"
+    iteration_log: False
+    output_transform: "$lambda x:x"

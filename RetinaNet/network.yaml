@@ -1,0 +1,64 @@
+anchor_generator: 
+  _target_: AnchorGeneratorWithAnchorShape
+  feature_map_scales: "$[2**l for l in range(len(@returned_layers) + 1)]"
+  base_anchor_shapes: "@base_anchor_shapes"
+
+backbone:
+  _target_: ResNet
+  spatial_dims: 3
+  block: "$monai.networks.nets.resnet.ResNetBottleneck"
+  layers:
+  - 3
+  - 4
+  - 6
+  - 3
+  block_inplanes: "$monai.networks.nets.resnet.get_inplanes()"
+  n_input_channels: "@in_channels"
+  conv1_t_stride: "@conv1_t_stride"
+  conv1_t_size: "$[max(7, 2 * s + 1) for s in @conv1_t_stride]"
+
+feature_extractor:
+  _target_: "$monai.apps.detection.networks.retinanet_network.resnet_fpn_feature_extractor"
+  backbone: "@backbone"
+  spatial_dims: 3
+  pretrained_backbone: False
+  trainable_backbone_layers: "@trainable_backbone_layers"
+  returned_layers: "@returned_layers"
+
+net:
+  _target_: RetinaNet
+  spatial_dims: 3 
+  num_classes: "$len(@fg_labels)"
+  num_anchors: "$@anchor_generator.num_anchors_per_location()[0]"
+  feature_extractor: "@feature_extractor"
+  size_divisible: "$[s * 2 * 2 ** max(@returned_layers) for s in @feature_extractor.body.conv1.stride]"
+
+detector:
+  _target_: "$src.network.RetinaNetBundleDetector"
+  network: "@net"
+  anchor_generator: "@anchor_generator"
+
+
+opt:
+  _target_: "$torch.optim.SGD"
+  params: "$@detector.network.parameters()"
+  lr: "@lr"
+  weight_decay: "@weight_decay"
+  momentum: "@sgd_momentum"
+  nesterov: "@sgd_nesterov"
+
+
+scheduler:
+  _target_: "$torch.optim.lr_scheduler.StepLR"
+  optimizer: "@opt"
+  gamma: "@scheduler_gamma"
+  step_size: "@scheduler_step_size"
+  
+scheduler_warmup:
+  _target_: "$src.scheduler.GradualWarmupScheduler"
+  optimizer: "@opt"
+  multiplier: "@scheduler_warmup_multiplier"
+  total_epoch: "@scheduler_warmup_total_epoch"
+  after_scheduler: "@scheduler"
+
+

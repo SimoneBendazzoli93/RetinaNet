@@ -1,0 +1,590 @@
+plan_transform:
+  _target_: Compose
+  transforms:
+  - _target_: LoadImaged
+    keys: "@image_modalities"
+    ensure_channel_first: True
+    
+preprocess_transform:
+  _target_: Compose
+  transforms:
+  - _target_: LoadImaged
+    keys: '@modalities'
+  - _target_: EnsureChannelFirstd
+    keys:
+    - '@instance_segmentation_key'
+    channel_dim: 'no_channel'
+  - _target_: EnsureChannelFirstd
+    keys: '@image_modalities'
+  - _target_: EnsureTyped
+    keys: '@image_modalities'
+    dtype: "$torch.float16"
+  - _target_: Orientationd
+    keys: '@modalities'
+    axcodes: "@orientation"
+  - _target_: Spacingd
+    keys: '@image_modalities'
+    pixdim: "@spacing"
+    mode: "bilinear"
+    padding_mode: "border"
+  - _target_: Spacingd
+    keys: '@seg_modalities'
+    pixdim: "@spacing"
+    mode: "nearest"
+    padding_mode: "border"
+  - _target_: ScaleIntensityd
+    keys: '@image_modalities'
+    channel_wise: True
+  - _target_: ConcatItemsd
+    keys: '@image_modalities'
+    name: '@image_key'
+
+save_preprocess_transforms:
+  _target_: Compose
+  transforms:
+  - _target_: SaveImaged
+    keys: "@image_key"
+    meta_keys: "image_meta_dict"
+    output_dir: "@preprocess_dir"
+    output_postfix: "@image_suffix"
+    output_name_formatter: "$PreprocessNameFormatter(@modality_conf[list(@modality_conf.keys())[0]]['suffix'])"
+    resample: False
+
+
+
+
+
+
+train_transforms:
+  _target_: Compose
+  transforms:
+  - _target_: LoadImaged
+    keys:
+    - '@image_key'
+    meta_key_postfix: "meta_dict"
+  - _target_: EnsureChannelFirstd
+    keys:
+    - '@image_key'
+  - _target_: EnsureTyped
+    keys:
+    - '@image_key'
+    - '@box_key'
+    dtype: "$torch.float32"
+  - _target_: EnsureTyped
+    keys:
+    - '@label_key'
+    dtype: "$torch.long"
+  - _target_: StandardizeEmptyBoxd
+    box_keys:
+    - '@box_key'
+    box_ref_image_keys: '@image_key'
+  - _target_: EnsureTyped
+    keys:
+      - '@image_key'
+    dtype: "$torch.float16"
+  #- _target_: ToDeviced
+  #  keys:
+  #    - '@image_key'
+  #    - '@box_key'
+  #    - '@label_key'
+  #  device: "cuda"
+  - _target_: RandCropBoxByPosNegLabeld
+    image_keys:
+    - "@image_key"
+    box_keys: '@box_key'
+    label_keys: '@label_key'
+    spatial_size: "@patch_size"
+    whole_box: True
+    num_samples: "@box_batch_size"
+    pos: 1
+    neg: 1
+  - _target_: RandZoomBoxd
+    image_keys:
+    - "@image_key"
+    box_keys:
+    - '@box_key'
+    box_ref_image_keys:
+    - "@image_key"
+    prob: 0.2
+    min_zoom: 0.7
+    max_zoom: 1.4
+    padding_mode: "constant"
+    keep_size: True
+  - _target_: ClipBoxToImaged
+    box_keys: '@box_key'
+    label_keys: '@label_key'
+    box_ref_image_keys: "@image_key"
+    remove_empty: True
+  - _target_:  RandFlipBoxd
+    image_keys:
+    - "@image_key"
+    box_keys:
+    - '@box_key'
+    box_ref_image_keys:
+    - "@image_key"
+    prob: 0.5
+    spatial_axis: 0
+  - _target_:  RandFlipBoxd
+    image_keys:
+    - "@image_key"
+    box_keys:
+    - '@box_key'
+    box_ref_image_keys:
+    - "@image_key"
+    prob: 0.5
+    spatial_axis: 1
+  - _target_:  RandFlipBoxd
+    image_keys:
+    - "@image_key"
+    box_keys:
+    - '@box_key'
+    box_ref_image_keys:
+    - "@image_key"
+    prob: 0.5
+    spatial_axis: 2
+  #- _target: RandRotateBox90d
+  #  image_keys:
+  #  - "@image_key"
+  #  box_keys:
+  #  - '@box_key'
+  #  box_ref_image_keys:
+  #  - "@image_key"
+  #  prob: 0.75
+  #  max_k: 3
+  #  spatial_axes:
+  #  - 0
+  #  - 1
+  - _target_: BoxToMaskd
+    box_keys:
+    - '@box_key'
+    label_keys:
+    - '@label_key'
+    box_mask_keys: "box_mask"
+    box_ref_image_keys:
+    - "@image_key"
+    min_fg_label: 0
+    ellipse_mask: True
+  - _target_ : RandRotated
+    keys:
+    - "@image_key"
+    - "box_mask"
+    mode:
+    - "nearest"
+    - "nearest"
+    prob: 0.2
+    range_x: "$np.pi / 6"
+    range_y: "$np.pi / 6"
+    range_z: "$np.pi / 6"
+    keep_size: True
+    padding_mode: "zeros"
+  - _target_ : MaskToBoxd
+    box_keys:
+    - '@box_key'
+    label_keys:
+    - '@label_key'
+    box_mask_keys: "box_mask"
+    min_fg_label: 0
+  - _target_ : DeleteItemsd
+    keys: "box_mask"
+  - _target_ : RandGaussianNoised
+    keys:
+    - "@image_key"
+    prob: 0.1
+    mean: 0
+    std: 0.1
+  - _target_: RandGaussianSmoothd
+    keys:
+    - "@image_key"
+    prob: 0.1
+    sigma_x:
+    - 0.5
+    - 1.0
+    sigma_y:
+    - 0.5
+    - 1.0
+    sigma_z:
+    - 0.5
+    - 1.0
+  - _target_: RandScaleIntensityd
+    keys:
+    - "@image_key"
+    prob: 0.15
+    factors: 0.25
+  - _target_: RandShiftIntensityd
+    keys:
+    - "@image_key"
+    prob: 0.15
+    offsets: 0.1
+  - _target_: RandAdjustContrastd
+    keys:
+    - "@image_key"
+    prob: 0.3
+    gamma:
+    - 0.7
+    - 1.5
+  - _target_: EnsureTyped
+    keys:
+    - "@image_key"
+    - "@box_key"
+    dtype: "$torch.float32"
+  - _target_: EnsureTyped
+    keys:
+    - "@label_key"
+    dtype: "$torch.long"
+
+
+
+val_transforms:
+  _target_: Compose
+  transforms:
+  - _target_: LoadImaged
+    keys:
+    - '@image_key'
+    meta_key_postfix: "meta_dict"
+  - _target_: EnsureChannelFirstd
+    keys:
+    - '@image_key'
+  - _target_: EnsureTyped
+    keys:
+    - '@image_key'
+    - '@box_key'
+    dtype: "$torch.float32"
+  - _target_: EnsureTyped
+    keys:
+    - '@label_key'
+    dtype: "$torch.long"
+  - _target_: StandardizeEmptyBoxd
+    box_keys:
+    - '@box_key'
+    box_ref_image_keys: '@image_key'
+  - _target_: EnsureTyped
+    keys:
+      - '@image_key'
+    dtype: "$torch.float16"
+  #- _target_: ClipBoxToImaged
+  #  box_keys: '@box_key'
+  #  label_keys: '@label_key'
+  #  box_ref_image_keys: "@image_key"
+  #  remove_empty: True
+  - _target_: RandCropBoxByPosNegLabeld
+    image_keys:
+      - "@image_key"
+    box_keys: '@box_key'
+    label_keys: '@label_key'
+    spatial_size: "@patch_size"
+    whole_box: True
+    num_samples: "@box_batch_size"
+    pos: 1
+    neg: 1
+  - _target_: EnsureTyped
+    keys:
+    - "@image_key"
+    - "@box_key"
+    dtype: "$torch.float32"
+  - _target_: EnsureTyped
+    keys:
+    - "@label_key"
+    dtype: "$torch.long"
+
+visualize_val_transforms:
+  _target_: Compose
+  transforms:
+  - _target_: LoadImaged
+    keys:
+    - '@image_key'
+    - '@instance_segmentation_key'
+    meta_key_postfix: "meta_dict"
+  - _target_: EnsureChannelFirstd
+    keys:
+    - '@image_key'
+    - '@instance_segmentation_key'
+  - _target_: EnsureTyped
+    keys:
+    - '@image_key'
+    - '@box_key'
+    dtype: "$torch.float32"
+  - _target_: EnsureTyped
+    keys:
+    - '@label_key'
+    dtype: "$torch.long"
+  - _target_: StandardizeEmptyBoxd
+    box_keys:
+    - '@box_key'
+    box_ref_image_keys: '@image_key'
+  - _target_: EnsureTyped
+    keys:
+      - '@image_key'
+    dtype: "$torch.float16"
+  #- _target_: ClipBoxToImaged
+  #  box_keys: '@box_key'
+  #  label_keys: '@label_key'
+  #  box_ref_image_keys: "@image_key"
+  #  remove_empty: True
+  - _target_: EnsureTyped
+    keys:
+    - "@image_key"
+    - "@box_key"
+    dtype: "$torch.float32"
+  - _target_: EnsureTyped
+    keys:
+    - "@label_key"
+    dtype: "$torch.long"
+  - _target_: Orientationd
+    keys: '@instance_segmentation_key'
+    axcodes: "@orientation"
+  - _target_: Spacingd
+    keys: '@instance_segmentation_key'
+    pixdim: "@spacing"
+    mode: "nearest"
+    padding_mode: "border"
+  
+
+final_val_transforms:
+  _target_: Compose
+  transforms:
+  - _target_: LoadImaged
+    keys:
+    - '@image_key'
+    meta_key_postfix: "meta_dict"
+  - _target_: EnsureChannelFirstd
+    keys:
+    - '@image_key'
+  - _target_: EnsureTyped
+    keys:
+    - '@image_key'
+    - '@box_key'
+    dtype: "$torch.float32"
+  - _target_: EnsureTyped
+    keys:
+    - '@label_key'
+    dtype: "$torch.long"
+  - _target_: StandardizeEmptyBoxd
+    box_keys:
+    - '@box_key'
+    box_ref_image_keys: '@image_key'
+  - _target_: EnsureTyped
+    keys:
+      - '@image_key'
+    dtype: "$torch.float16"
+  #- _target_: ClipBoxToImaged
+  #  box_keys: '@box_key'
+  #  label_keys: '@label_key'
+  #  box_ref_image_keys: "@image_key"
+  #  remove_empty: True
+  - _target_: EnsureTyped
+    keys:
+    - "@image_key"
+    - "@box_key"
+    dtype: "$torch.float32"
+  - _target_: EnsureTyped
+    keys:
+    - "@label_key"
+    dtype: "$torch.long"
+
+
+visualize_train_transforms:
+  _target_: Compose
+  transforms:
+  - _target_: LoadImaged
+    keys:
+    - '@image_key'
+    - '@instance_segmentation_key'
+    meta_key_postfix: "meta_dict"
+  - _target_: EnsureChannelFirstd
+    keys:
+    - '@image_key'
+    - '@instance_segmentation_key'
+  - _target_: EnsureTyped
+    keys:
+    - '@image_key'
+    - '@box_key'
+    dtype: "$torch.float32"
+  - _target_: EnsureTyped
+    keys:
+    - '@label_key'
+    dtype: "$torch.long"
+  - _target_: StandardizeEmptyBoxd
+    box_keys:
+    - '@box_key'
+    box_ref_image_keys: '@image_key'
+  - _target_: EnsureTyped
+    keys:
+      - '@image_key'
+    dtype: "$torch.float16"
+  #- _target_: ToDeviced
+  #  keys:
+  #    - '@image_key'
+  #    - '@box_key'
+  #    - '@label_key'
+  #  device: "cuda"
+  - _target_: Orientationd
+    keys: '@instance_segmentation_key'
+    axcodes: "@orientation"
+  - _target_: Spacingd
+    keys: '@instance_segmentation_key'
+    pixdim: "@spacing"
+    mode: "nearest"
+    padding_mode: "border"
+  - _target_: RandCropBoxByPosNegLabeld
+    image_keys:
+    - "@image_key"
+    - '@instance_segmentation_key'
+    box_keys: '@box_key'
+    label_keys: '@label_key'
+    spatial_size: "@patch_size"
+    whole_box: True
+    num_samples: "@box_batch_size"
+    pos: 1
+    neg: 1
+  - _target_: RandZoomBoxd
+    image_keys:
+    - "@image_key"
+    box_keys:
+    - '@box_key'
+    box_ref_image_keys:
+      - '@image_key'
+      - '@instance_segmentation_key'
+    prob: 0.2
+    min_zoom: 0.7
+    max_zoom: 1.4
+    padding_mode: "constant"
+    keep_size: True
+  - _target_: ClipBoxToImaged
+    box_keys: '@box_key'
+    label_keys: '@label_key'
+    box_ref_image_keys:
+      - '@image_key'
+      - '@instance_segmentation_key'
+    remove_empty: True
+  - _target_:  RandFlipBoxd
+    image_keys:
+    - "@image_key"
+    box_keys:
+    - '@box_key'
+    box_ref_image_keys:
+    - '@image_key'
+    - '@instance_segmentation_key'
+    prob: 0.5
+    spatial_axis: 0
+  - _target_:  RandFlipBoxd
+    image_keys:
+    - "@image_key"
+    box_keys:
+    - '@box_key'
+    box_ref_image_keys:
+    - '@image_key'
+    - '@instance_segmentation_key'
+    prob: 0.5
+    spatial_axis: 1
+  - _target_:  RandFlipBoxd
+    image_keys:
+    - "@image_key"
+    box_keys:
+    - '@box_key'
+    box_ref_image_keys:
+    - '@image_key'
+    - '@instance_segmentation_key'
+    prob: 0.5
+    spatial_axis: 2
+  #- _target: RandRotateBox90d
+  #  image_keys:
+  #  - "@image_key"
+  #  box_keys:
+  #  - '@box_key'
+  #  box_ref_image_keys:
+  #  - "@image_key"
+  #  prob: 0.75
+  #  max_k: 3
+  #  spatial_axes:
+  #  - 0
+  #  - 1
+  - _target_: BoxToMaskd
+    box_keys:
+    - '@box_key'
+    label_keys:
+    - '@label_key'
+    box_mask_keys: "box_mask"
+    box_ref_image_keys:
+    - '@image_key'
+    - '@instance_segmentation_key'
+    min_fg_label: 0
+    ellipse_mask: True
+  - _target_ : RandRotated
+    keys:
+    - '@image_key'
+    - '@instance_segmentation_key'
+    - "box_mask"
+    mode:
+    - "nearest"
+    - "nearest"
+    prob: 0.2
+    range_x: "$np.pi / 6"
+    range_y: "$np.pi / 6"
+    range_z: "$np.pi / 6"
+    keep_size: True
+    padding_mode: "zeros"
+  - _target_ : MaskToBoxd
+    box_keys:
+    - '@box_key'
+    label_keys:
+    - '@label_key'
+    box_mask_keys: "box_mask"
+    min_fg_label: 0
+  - _target_ : DeleteItemsd
+    keys: "box_mask"
+  - _target_ : RandGaussianNoised
+    keys:
+    - "@image_key"
+    prob: 0.1
+    mean: 0
+    std: 0.1
+  - _target_: RandGaussianSmoothd
+    keys:
+    - "@image_key"
+    prob: 0.1
+    sigma_x:
+    - 0.5
+    - 1.0
+    sigma_y:
+    - 0.5
+    - 1.0
+    sigma_z:
+    - 0.5
+    - 1.0
+  - _target_: RandScaleIntensityd
+    keys:
+    - "@image_key"
+    prob: 0.15
+    factors: 0.25
+  - _target_: RandShiftIntensityd
+    keys:
+    - "@image_key"
+    prob: 0.15
+    offsets: 0.1
+  - _target_: RandAdjustContrastd
+    keys:
+    - "@image_key"
+    prob: 0.3
+    gamma:
+    - 0.7
+    - 1.5
+  - _target_: EnsureTyped
+    keys:
+    - "@image_key"
+    - "@box_key"
+    dtype: "$torch.float32"
+  - _target_: EnsureTyped
+    keys:
+    - "@label_key"
+    dtype: "$torch.long"
+
+
+val_postprocessing:
+  _target_: Compose
+  transforms:
+    - _target_: src.transforms.SaveDetectionPredictionsd
+      keys: "pred"
+      output_dir: "@preprocess_dir"
+      output_postfix: "pred_boxes"
+      run_id: '@run_name'
+      key_postfix: "$@modality_conf['image']['suffix']"

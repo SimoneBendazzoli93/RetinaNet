@@ -1,0 +1,86 @@
+#Set after Planning
+orientation: "RAS"
+spacing:
+  - 2.03642011
+  - 2.03642011
+  - 3.0
+
+data_dir: "/mnt/Data/2024-05-10_Autopet_v1.1"
+preprocess_dir: "/mnt/Data/2024-05-10_Autopet_v1.1/preprocess"
+
+modality_conf:
+  ct:
+    suffix: "_0000.nii.gz"
+  pet:
+    suffix: "_0001.nii.gz"
+  seg:
+    suffix: ".nii.gz"
+  inst_seg:
+    suffix: ".nii.gz"
+  image:
+    suffix: $'_'+@image_suffix+'.nii.gz'
+
+image_suffix: "PET-CT"
+
+
+dataset_name: "$str(pathlib.Path(@data_dir).name)"
+plan_filename: $str(@bundle_root) + '/' +@dataset_name+'_Plan.json'
+data_list_file_path: $str(@bundle_root) + '/'+@dataset_name+'_Filtered.json'
+
+
+batch_size: 8
+train_cache_num: 125
+train_workers: 32
+val_workers: 16
+box_batch_size: 2
+patch_size:
+- 64
+- 64
+- 64
+
+lr: 0.01
+sgd_momentum: 0.9
+sgd_nesterov: True
+weight_decay: 0.00003
+
+max_num_epochs: 300
+num_train_batches_per_epoch: 125
+num_val_batches_per_epoch: 100
+
+trainable_backbone_layers: None
+# Model parameters
+n_classes: 2
+in_channels: 2
+returned_layers:
+- 1
+- 2
+
+conv1_t_stride:
+- 2
+- 2
+- 1
+
+scheduler_gamma: 0.1
+scheduler_step_size: 150
+
+scheduler_warmup_multiplier: 1
+scheduler_warmup_total_epoch: 10
+
+fg_labels:
+- Lesion
+
+atss_matcher_kwargs:
+  num_candidates: 4
+  center_in_gt: False
+
+hard_negative_sampler_kwargs:
+  batch_size_per_image: 64
+  positive_fraction: 0.3
+  pool_size: 20
+  min_neg: 16
+
+box_selector_kwargs:
+  score_thresh: 0.02
+  topk_candidates_per_level: 1000
+  nms_thresh: 0.22
+  detections_per_img: 100

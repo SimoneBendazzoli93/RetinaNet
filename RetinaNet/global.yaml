@@ -1,0 +1,40 @@
+bundle_root: $HOME/MONAI_Experiments/Detection/RetinaNet
+mlflow_tracking_uri: "https://admin.app.cloud.cbh.kth.se/mlflow"
+run_prefix: "RetinaNet"
+experiment_name: "AutoPET_Cancer_Detection"
+#Dataset
+modalities:
+- "ct"
+- "pet"
+- "inst_seg"
+image_modalities:
+- "ct"
+- "pet"
+seg_modalities:
+- "inst_seg"
+
+image_key: "image"
+
+instance_segmentation_key: "inst_seg"
+label_key: "label"
+box_key: "box"
+
+trainable_backbone_layers: None
+
+
+ckpt_dir: $@bundle_root + '/models/'+@run_prefix+'_models/trainable_backbone_layers='+str(@trainable_backbone_layers)+'-lr='+str(@lr)
+
+output_metric_file: $@bundle_root + '/'+@run_name+'_Validation.json'
+# Training parameters
+
+
+val_roi_size: "@patch_size"
+
+base_anchor_shapes: "$[[w,h,d] for w in @width for h in @height for d in @depth]"
+
+# MLFlow parameters
+job_id: $os.environ['SLURM_JOB_ID']
+
+run_name: $@run_prefix+'-'+@job_id+'-'+datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
+
+

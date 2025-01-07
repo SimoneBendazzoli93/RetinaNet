@@ -1,0 +1,127 @@
+data_list: "$get_decathlon_dataset(@data_dir, @modality_conf,@instance_segmentation_key,'labelsInstTr')"
+
+
+partitioned_dataset: "$monai.data.utils.partition_dataset(data=@data_list, ratios=[0.8, 0.2], shuffle=True)"
+
+
+plan_train_dataset:
+  _target_: CacheDataset
+  data: "$@partitioned_dataset[0]"
+  transform: "@plan_transform"
+  num_workers: "@train_workers"
+  cache_num: "@train_workers"
+  runtime_cache: "processes"
+
+  
+plan_val_dataset:
+  _target_: CacheDataset
+  data: "$@partitioned_dataset[1]"
+  transform: "@plan_transform"
+  num_workers: "@val_workers"
+  cache_num: "@val_workers"
+  runtime_cache: "processes"
+
+
+plan_train_loader:
+  _target_: DataLoader
+  dataset: "@plan_train_dataset"
+  batch_size: "@batch_size"
+  collate_fn: "$monai.data.utils.no_collation"
+  num_workers: "@train_workers"
+
+plan_val_loader:
+  _target_: DataLoader
+  dataset: "@plan_val_dataset"
+  batch_size: "@batch_size"
+  collate_fn: "$monai.data.utils.no_collation"
+  num_workers: "@val_workers"
+  
+preprocess_train_dataset:
+  _target_: Dataset
+  data: "$@partitioned_dataset[0]"
+
+  
+preprocess_val_dataset:
+  _target_: Dataset
+  data: "$@partitioned_dataset[1]"
+  
+  
+train_data: "$monai.data.load_decathlon_datalist( @data_list_file_path, is_segmentation=True, data_list_key='training', base_dir=@preprocess_dir)"
+val_data: "$monai.data.load_decathlon_datalist( @data_list_file_path, is_segmentation=True, data_list_key='validation', base_dir=@preprocess_dir)"
+
+train_dataset:
+  _target_: CacheDataset
+  data: "@train_data"
+  transform: "@train_transforms"
+  num_workers: "@train_workers"
+  cache_num: "@train_cache_num"
+  #runtime_cache: "processes"
+
+val_dataset:
+  _target_: CacheDataset
+  data: "@val_data"
+  transform: "@val_transforms"
+  cache_num: "@val_workers"
+  num_workers: "@val_workers"
+
+
+train_loader:
+  _target_: DataLoader
+  dataset: "@train_dataset"
+  batch_size: "@batch_size"
+  pin_memory: True
+  shuffle: True
+  collate_fn: "$monai.data.utils.no_collation"
+  num_workers: "@train_workers"
+
+
+val_loader:
+  _target_: DataLoader
+  dataset: "@val_dataset"
+  batch_size: 1
+  collate_fn: "$monai.data.utils.no_collation"
+  num_workers: "@val_workers"
+
+# Global Validation
+final_val_dataset:
+  _target_: Dataset
+  data: "@val_data"
+  transform: "@final_val_transforms"
+
+final_val_loader:
+  _target_: DataLoader
+  dataset: "@final_val_dataset"
+  batch_size: 1
+  collate_fn: "$monai.data.utils.no_collation"
+  num_workers: "@val_workers"
+
+# Visualize Segmentation
+visualize_train_dataset:
+  _target_: CacheDataset
+  data: "@train_data"
+  transform: "@visualize_train_transforms"
+  num_workers: "@train_workers"
+  cache_num: "@train_workers"
+  runtime_cache: "processes"
+  
+visualize_val_dataset:
+  _target_: CacheDataset
+  data: "@val_data"
+  transform: "@visualize_val_transforms"
+  cache_num: "@val_workers"
+  num_workers: "@val_workers"
+
+visualize_train_loader:
+  _target_: DataLoader
+  dataset: "@visualize_train_dataset"
+  batch_size: "@batch_size"
+  shuffle: True
+  collate_fn: "$monai.data.utils.no_collation"
+  num_workers: "@train_workers"
+
+visualize_val_loader:
+  _target_: DataLoader
+  dataset: "@visualize_val_dataset"
+  batch_size: 1
+  collate_fn: "$monai.data.utils.no_collation"
+  num_workers: "@val_workers"

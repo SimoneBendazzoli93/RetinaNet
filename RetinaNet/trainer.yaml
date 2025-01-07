@@ -1,0 +1,52 @@
+prepare_batch: "$src.batch_helper.PrepareBatch(@image_key, @label_key, @box_key)"
+
+pbar:
+  _target_: "ignite.contrib.handlers.tqdm_logger.ProgressBar"
+
+trainer:
+  _target_: SupervisedTrainer
+  device: "cuda"
+  max_epochs: "@max_num_epochs"
+  epoch_length: "@num_train_batches_per_epoch"
+  train_data_loader: "@train_loader"
+  prepare_batch: "@prepare_batch"
+  network: "@detector"
+  optimizer: "@opt"
+  amp: True
+  loss_function: "$src.network.detection_loss"
+  decollate: false
+  train_handlers:
+  - _target_: "LrScheduleHandler"
+    lr_scheduler: "@scheduler_warmup"
+  - _target_: StatsHandler
+    output_transform: "$lambda x:x"
+  - _target_: ValidationHandler
+    interval: 1
+    validator: "@validator"
+    exec_at_start: False
+  - _target_: MLFlowHandler
+    tracking_uri: "@mlflow_tracking_uri"
+    experiment_name: "@experiment_name"
+    run_name: "@run_name"
+    output_transform: "$lambda x:x['loss']"
+    dataset_dict:
+      train: "@train_dataset"
+    dataset_keys:
+      - "ct"
+      - "pet"
+      - "inst_seg"
+      - "image"
+    state_attributes:
+      - "iteration"
+      - "epoch"
+    tag_name: 'Train_Loss'
+    experiment_param: "$src.helpers.create_mlflow_experiment_params( @bundle_root + '/RetinaNet/params.yaml', @custom_params)"
+  - _target_: CheckpointSaver
+    save_dir: "@ckpt_dir"
+    save_dict:
+      detector: "@detector"
+      opt: "@opt"
+      scheduler_warmup: "@scheduler_warmup"
+      scheduler: "@scheduler"
+    save_interval: 1
+    n_saved: 1

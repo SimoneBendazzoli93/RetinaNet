@@ -1,0 +1,6 @@
+preprocess_datasets:
+  training: "@preprocess_train_dataset"
+  validation: "@preprocess_val_dataset"
+
+preprocess:
+- '$preprocess(@preprocess_datasets, @preprocess_transform, @modality_conf, @box_key, @label_key, @instance_segmentation_key, @data_list_file_path, @save_preprocess_transforms)'

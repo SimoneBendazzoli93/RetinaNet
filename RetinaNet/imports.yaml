@@ -1,0 +1,19 @@
+imports:
+- "$import os"
+- "$import pathlib"
+- "$import json"
+- "$import src"
+- "$import src.dataset"
+- "$import src.preprocessing"
+- "$import src.batch_helper"
+- "$import src.helpers"
+- "$import src.scheduler"
+- "$import src.network"
+- "$import src.ignite_metric"
+- "$import ignite"
+- "$import monai"
+- "$from src.preprocessing import run_planning"
+- "$from src.dataset import get_decathlon_dataset"
+- $from src.preprocessing import PreprocessNameFormatter
+- $from src.preprocessing import preprocess
+- $import datetime

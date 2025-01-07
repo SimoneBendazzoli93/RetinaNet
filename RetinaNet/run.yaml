@@ -1,0 +1,5 @@
+train:
+- "$@detector.network.to('cuda')"
+- "$src.helpers.configure_detector(@detector,@hard_negative_sampler_kwargs,@box_selector_kwargs,@val_roi_size, @atss_matcher_kwargs)"
+- "$@scheduler_warmup.step()"
+- "$@trainer.run()"
