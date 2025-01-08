@@ -1,0 +1,11 @@
+#Alvis 
+bundle_root: "$HOME/MONAI_Bundles/Detection/RetinaNet"
+preprocess_dir: "/mnt/Data/Data/2024-05-10_Autopet_v1.1/preprocess"
+
+train_workers: 8
+train_cache_num: 8
+val_workers: 4
+batch_size: 8
+num_train_batches_per_epoch:  12
+num_val_batches_per_epoch: 12
+max_num_epochs: 418

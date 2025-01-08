@@ -2,9 +2,10 @@ lr: 0.001
 warmup_lr: 0.01
 start_epoch: 300
 max_num_epochs: 600
+
 pretrained_backbone: True
 trainable_backbone_layers: 5
-warmup_trainable_backbone_layers: 2
+warmup_trainable_backbone_layers: 5
 
 custom_params:
   warmup_lr: "@warmup_lr"
@@ -15,14 +16,15 @@ custom_params:
   start_epoch: "@start_epoch"
   max_num_epochs: "@max_num_epochs"
 
+run_prefix: "RetinaNet-2x1-Pretrained"
+warmup_run_prefix: 'RetinaNet-2x1-Warmup'
 
-backbone: "$src.network.load_pretrained_resnet(@in_channels, @conv1_t_stride, [max(7, 2 * s + 1) for s in @conv1_t_stride])"
+backbone: "$src.network.resnet50_2x1(pretrained=True, n_input_channels=1, shortcut_type='B', bias_downsample=False, feed_forward=False, conv1_t_stride=@conv1_t_stride, conv1_t_size=[max(7, 2 * s + 1) for s in @conv1_t_stride])"
+
 warmup_ckpt_dir: $@bundle_root + '/models/'+@warmup_run_prefix+'_models/trainable_backbone_layers='+str(@warmup_trainable_backbone_layers)+'-lr='+str(@warmup_lr)
 resume_ckpt_dir: "@warmup_ckpt_dir"
 ckpt_dir:  $@bundle_root + '/models/'+@run_prefix+'_models/trainable_backbone_layers='+str(@warmup_trainable_backbone_layers)+'--'+str(@trainable_backbone_layers)+'-lr='+str(@lr)
 
-warmup_run_prefix: 'RetinaNet-Warmup'
-run_prefix: 'RetinaNet-Pretrained'
 
 train:
   - "$@detector.network.to('cuda')"

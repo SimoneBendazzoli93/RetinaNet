@@ -5,6 +5,8 @@ train:
   - "$src.helpers.reload_checkpoint(@trainer, @reload_checkpoint_epoch, @num_train_batches_per_epoch, @ckpt_dir)"
   - "$@trainer.run()"
 
+resume_ckpt_dir: "@ckpt_dir"
+
 trainer:
   _target_: SupervisedTrainer
   device: "cuda"
@@ -46,7 +48,7 @@ trainer:
     n_saved: 1
   #Added
   - _target_: CheckpointLoader
-    load_path: $@ckpt_dir + '/checkpoint_epoch='+str(src.helpers.get_checkpoint(@reload_checkpoint_epoch,@ckpt_dir))+'.pt'
+    load_path: $@resume_ckpt_dir + '/checkpoint_epoch='+str(src.helpers.get_checkpoint(@reload_checkpoint_epoch,@resume_ckpt_dir))+'.pt'
     load_dict:
       detector: "@detector"
       opt: "@opt"

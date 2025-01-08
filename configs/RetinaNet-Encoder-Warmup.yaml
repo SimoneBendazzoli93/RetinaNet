@@ -1,0 +1,16 @@
+max_num_epochs: 300
+pretrained_backbone: True
+trainable_backbone_layers: 5
+lr: 0.01
+
+
+run_prefix: "RetinaNet-Encoder-Warmup"
+
+custom_params:
+  max_num_epochs: "@max_num_epochs"
+  pretrained_backbone: "@pretrained_backbone"
+  trainable_backbone_layers: "@trainable_backbone_layers"
+  num_train_batches_per_epoch: "@num_train_batches_per_epoch"
+  lr: "@lr"
+
+backbone: "$src.network.resnet50_encoder(pretrained=True, n_input_channels=1, shortcut_type='B', bias_downsample=False, feed_forward=False, conv1_t_stride=@conv1_t_stride, conv1_t_size=[max(7, 2 * s + 1) for s in @conv1_t_stride])"
